@@ -377,6 +377,7 @@ Thanks to all the contributors who have helped make Koharu better!
   <img src="https://contrib.rocks/image?repo=mayocream/koharu" />
 </a>
 
+
 ## License
 
 Koharu is licensed under the [GNU General Public License v3.0](LICENSE).
