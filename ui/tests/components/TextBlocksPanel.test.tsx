@@ -3,7 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it } from 'vitest'
 
+import { MenuBar } from '@/components/MenuBar'
 import { TextBlocksPanel } from '@/components/panels/TextBlocksPanel'
+import { queryClient } from '@/lib/queryClient'
 import { useEditorUiStore } from '@/lib/stores/editorUiStore'
 import { useJobsStore } from '@/lib/stores/jobsStore'
 import { usePreferencesStore } from '@/lib/stores/preferencesStore'
@@ -48,6 +50,7 @@ describe('TextBlocksPanel', () => {
     useSelectionStore.getState().setPage('p1')
     useSelectionStore.getState().select('t2', false)
     useJobsStore.getState().clear()
+    queryClient.clear()
     useEditorUiStore.setState({ selectedLanguage: 'en' })
     usePreferencesStore.setState({
       customSystemPrompt: 'translate naturally',
@@ -99,6 +102,59 @@ describe('TextBlocksPanel', () => {
         includePreviousTranslations: true,
         maxContextChars: 4000,
       },
+    })
+  })
+
+  it('deletes the corresponding text block when the delete button is clicked', async () => {
+    let lastOp: any = null
+
+    server.use(
+      http.get('/api/v1/scene.json', () => HttpResponse.json(sceneWithTextNodes())),
+      http.post('/api/v1/history/apply', async ({ request }) => {
+        lastOp = await request.json()
+        return HttpResponse.json({ epoch: 2 })
+      }),
+    )
+    renderWithQuery(<TextBlocksPanel />)
+
+    const block0 = await screen.findByTestId('textblock-trigger-0')
+    await userEvent.click(block0)
+    const button0 = await screen.findByTestId('textblock-delete-0')
+    await userEvent.click(button0)
+
+    expect(lastOp).toMatchObject({ removeNode: { id: 't1' } })
+
+    const block1 = await screen.findByTestId('textblock-trigger-1')
+    await userEvent.click(block1)
+    const button1 = await screen.findByTestId('textblock-delete-1')
+    await userEvent.click(button1)
+
+    expect(lastOp).toMatchObject({ removeNode: { id: 't2' } })
+  })
+
+  it('deletes all text blocks when the batch delete button is clicked', async () => {
+    let lastOp: any = null
+
+    server.use(
+      http.get('/api/v1/scene.json', () => HttpResponse.json(sceneWithTextNodes())),
+      http.post('/api/v1/history/apply', async ({ request }) => {
+        lastOp = await request.json()
+        return HttpResponse.json({ epoch: 2 })
+      }),
+    )
+    renderWithQuery(
+      <div>
+        <MenuBar />
+        <TextBlocksPanel />
+      </div>,
+    )
+
+    await userEvent.click(await screen.findByTestId('menu-edit-trigger'))
+    await userEvent.click(await screen.findByTestId('menu-edit-select-all'))
+    await userEvent.click(await screen.findByTestId('textblocks-delete-selected'))
+
+    expect(lastOp).toMatchObject({
+      batch: { ops: [{ removeNode: { id: 't1' } }, { removeNode: { id: 't2' } }] },
     })
   })
 })

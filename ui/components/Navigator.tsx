@@ -4,9 +4,18 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { LayoutGridIcon, Trash2Icon } from 'lucide-react'
 import { memo, useCallback, useMemo, useRef, useState } from 'react'
 import type React from 'react'
+import { useHotkeys } from 'react-hotkeys-hook'
 import { useTranslation } from 'react-i18next'
 
 import { PageManagerDialog } from '@/components/PageManagerDialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useScene } from '@/hooks/useScene'
@@ -35,6 +44,12 @@ export function Navigator() {
   const viewportRef = useRef<HTMLDivElement | null>(null)
   const { t } = useTranslation()
   const [pageManagerOpen, setPageManagerOpen] = useState(false)
+  const [pageToDeleteId, setPageToDeleteId] = useState<string | null>(null)
+
+  const pageToDeleteIndex = useMemo(() => {
+    if (!pageToDeleteId) return -1
+    return pages.findIndex((p) => p.id === pageToDeleteId)
+  }, [pageToDeleteId, pages])
 
   const handleSelect = useCallback(
     (id: string, event: React.MouseEvent | React.KeyboardEvent) => {
@@ -121,17 +136,22 @@ export function Navigator() {
     [pages, pagesMap, pageId, setPage, totalPages, t, setSelectedPageIds],
   )
 
-  const handleDeletePage = useCallback(
-    (id: string) => {
-      void handleDeletePages(new Set([id]))
-    },
-    [handleDeletePages],
-  )
+  const handleDeletePage = useCallback((id: string) => {
+    setPageToDeleteId(id)
+  }, [])
 
   const handleBatchDelete = useCallback(() => {
-    const { selectedPageIds } = useSelectionStore.getState()
     void handleDeletePages(selectedPageIds)
-  }, [handleDeletePages])
+  }, [handleDeletePages, selectedPageIds])
+
+  const delHotkeyRef = useHotkeys(
+    'delete',
+    () => {
+      handleBatchDelete()
+    },
+    { enabled: selectedPageIds.size !== 0 },
+    [handleDeletePages],
+  )
 
   const virtualizer = useVirtualizer({
     count: totalPages,
@@ -142,6 +162,8 @@ export function Navigator() {
 
   return (
     <div
+      tabIndex={-1}
+      ref={delHotkeyRef}
       data-testid='navigator-panel'
       data-total-pages={totalPages}
       className='flex h-full min-h-0 w-full flex-col bg-muted/50'
@@ -202,7 +224,6 @@ export function Navigator() {
                   onSelect={handleSelect}
                   canDelete={totalPages > 1}
                   onDelete={handleDeletePage}
-                  onBatchDelete={handleBatchDelete}
                 />
               </div>
             )
@@ -211,6 +232,36 @@ export function Navigator() {
       </ScrollArea>
 
       <PageManagerDialog open={pageManagerOpen} onOpenChange={setPageManagerOpen} />
+
+      <AlertDialog
+        open={!!pageToDeleteId}
+        onOpenChange={(open) => !open && setPageToDeleteId(null)}
+      >
+        <AlertDialogContent>
+          <div className='flex flex-col gap-1.5 text-center sm:text-left'>
+            <AlertDialogTitle>{t('navigator.deleteConfirmTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('navigator.deleteConfirmDescription', {
+                index: pageToDeleteIndex + 1,
+              })}
+            </AlertDialogDescription>
+          </div>
+          <div className='flex flex-col-reverse gap-2 sm:flex-row sm:justify-end'>
+            <AlertDialogCancel>{t('common.cancel', 'Cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pageToDeleteId) {
+                  void handleDeletePages(new Set([pageToDeleteId]))
+                  setPageToDeleteId(null)
+                }
+              }}
+              className='text-destructive-foreground bg-destructive hover:bg-destructive/90'
+            >
+              {t('common.delete', 'Delete')}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
@@ -223,7 +274,6 @@ type PagePreviewProps = {
   onSelect: (id: string, e: React.MouseEvent | React.KeyboardEvent) => void
   canDelete: boolean
   onDelete: (id: string) => void
-  onBatchDelete: () => void
 }
 
 const PagePreview = memo(function PagePreview({
@@ -234,7 +284,6 @@ const PagePreview = memo(function PagePreview({
   onSelect,
   canDelete,
   onDelete,
-  onBatchDelete,
 }: PagePreviewProps) {
   const src = pageId ? `${getGetPageThumbnailUrl(pageId)}?size=${200 * THUMBNAIL_DPR}` : undefined
   const { t } = useTranslation()
@@ -248,9 +297,6 @@ const PagePreview = memo(function PagePreview({
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
           onSelect(pageId, e)
-        } else if (e.key === 'Delete') {
-          e.preventDefault()
-          onBatchDelete()
         }
       }}
       data-testid={`navigator-page-${index}`}
