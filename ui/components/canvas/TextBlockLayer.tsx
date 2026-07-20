@@ -1,8 +1,7 @@
 'use client'
 
 import { useDrag } from '@use-gesture/react'
-import { useMemo, useRef } from 'react'
-import { useHotkeys } from 'react-hotkeys-hook'
+import { useEffect, useRef } from 'react'
 
 import { useBlobImage } from '@/hooks/useBlobData'
 import { useCurrentPage, useTextNodes, type TextNodeEntry } from '@/hooks/useCurrentPage'
@@ -31,30 +30,6 @@ export function TextBlockLayer({ showSprites, scale, style }: TextBlockLayerProp
   const mode = useEditorUiStore((s) => s.mode)
   const interactive = mode === 'select' || mode === 'block'
 
-  const hasSelection = useMemo(() => {
-    for (const id of selectedIds) if (id) return true
-    return false
-  }, [selectedIds])
-
-  const removeNode = async (id: string) => {
-    if (!page) return
-    const node = page.nodes[id]
-    if (!node) return
-    const idx = Object.keys(page.nodes).indexOf(id)
-    await applyOp(ops.removeNode(page.id, id, node, idx < 0 ? 0 : idx))
-    if ('text' in node.kind) queueAutoRender(page.id)
-  }
-
-  const removeSelected = async () => {
-    if (!page) return
-    // Snapshot selection now: each op invalidates the page state by removing a
-    // node, so we can't iterate against a stale closure mid-loop.
-    const ids = Array.from(selectedIds).filter((id): id is string => !!id)
-    for (const id of ids) {
-      await removeNode(id)
-    }
-  }
-
   const updateTransform = async (id: string, t: Transform) => {
     if (!page) return
     const data: NodeDataPatch = {
@@ -65,15 +40,6 @@ export function TextBlockLayer({ showSprites, scale, style }: TextBlockLayerProp
     await applyOp(ops.updateNode(page.id, id, { transform: t, data }))
     queueAutoRender(page.id)
   }
-
-  useHotkeys(
-    'delete',
-    () => {
-      if (hasSelection && interactive) void removeSelected()
-    },
-    { enabled: hasSelection && interactive },
-    [selectedIds, interactive],
-  )
 
   return (
     <div
@@ -139,6 +105,12 @@ function TextBlockItem({
   const edgeRef = useRef<ResizeEdge | null>(null)
   const isResizeRef = useRef(false)
 
+  useEffect(() => {
+    if (selected && boxRef.current) {
+      boxRef.current.focus()
+    }
+  }, [selected])
+
   const setBox = (x: number, y: number, w: number, h: number) => {
     const el = boxRef.current
     if (!el) return
@@ -156,6 +128,7 @@ function TextBlockItem({
       const additive = isAdditiveEvent(event)
       if (tap) {
         onSelect(node.id, additive)
+        boxRef.current?.focus()
         return
       }
       if (first) {
@@ -168,6 +141,7 @@ function TextBlockItem({
         // Keep multi-selection intact when dragging a node that's already selected;
         // otherwise this click is a single-select (unless the modifier is held).
         if (additive || !selected) onSelect(node.id, additive)
+        boxRef.current?.focus()
       }
       const { x: sx, y: sy, w: sw, h: sh } = dragStart.current
       const edge = edgeRef.current
@@ -236,6 +210,7 @@ function TextBlockItem({
     <div
       ref={boxRef}
       {...bind()}
+      tabIndex={-1}
       style={{
         position: 'absolute',
         top: 0,
@@ -247,6 +222,7 @@ function TextBlockItem({
         zIndex: selected ? 20 : 10,
         touchAction: 'none',
         cursor: interactive ? 'move' : 'default',
+        outline: 'none',
       }}
     >
       <div

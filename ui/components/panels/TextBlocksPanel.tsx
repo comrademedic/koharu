@@ -3,6 +3,7 @@
 import { Languages, LoaderCircleIcon, ScanTextIcon, Trash2Icon } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useEffect } from 'react'
+import { useHotkeys } from 'react-hotkeys-hook'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -24,15 +25,18 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useCurrentPage, useTextNodes, type TextNodeEntry } from '@/hooks/useCurrentPage'
 import { getConfig, startPipeline, useGetCurrentLlm } from '@/lib/api/default/default'
-import { fetchApi } from '@/lib/api/fetch'
 import type { TextDataPatch } from '@/lib/api/schemas'
-import { applyOp, invalidateScene, queueAutoRender, reorderPageTextNodes } from '@/lib/io/scene'
+import { applyOp, queueAutoRender, reorderPageTextNodes } from '@/lib/io/scene'
 import { ops } from '@/lib/ops'
 import { useEditorUiStore } from '@/lib/stores/editorUiStore'
 import { useJobsStore } from '@/lib/stores/jobsStore'
 import { usePreferencesStore } from '@/lib/stores/preferencesStore'
 import { useSelectionStore } from '@/lib/stores/selectionStore'
+<<<<<<< HEAD
 import { buildTranslationContext } from '@/lib/translationContext'
+=======
+import { cn } from '@/lib/utils'
+>>>>>>> upstream/main
 
 export function TextBlocksPanel() {
   const { t } = useTranslation()
@@ -82,6 +86,18 @@ export function TextBlocksPanel() {
     if (!node) return
     const idx = Object.keys(page.nodes).indexOf(nodeId)
     await applyOp(ops.removeNode(page.id, nodeId, node, idx < 0 ? 0 : idx))
+    clearSelection()
+    queueAutoRender(page.id)
+  }
+
+  const removeNodes = async (nodeIds: string[]) => {
+    const batch = nodeIds.flatMap((nodeId) => {
+      const node = page.nodes[nodeId]
+      if (!node) return []
+      const idx = Object.keys(page.nodes).indexOf(nodeId)
+      return [ops.removeNode(page.id, nodeId, node, idx < 0 ? 0 : idx)]
+    })
+    await applyOp(ops.batch('removeNodes', batch))
     clearSelection()
     queueAutoRender(page.id)
   }
@@ -213,6 +229,30 @@ export function TextBlocksPanel() {
           )}
         </div>
       </ScrollArea>
+      <div
+        className={cn(
+          'flex items-center justify-between border-t border-border px-2 py-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase',
+          selectedIds.size <= 1 && 'hidden',
+        )}
+      >
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              data-testid='textblocks-delete-selected'
+              aria-label={t('workspace.deleteSelected')}
+              variant='ghost'
+              size='icon-xs'
+              className='size-5 text-rose-600 hover:text-rose-600'
+              onClick={() => removeNodes([...selectedIds])}
+            >
+              <Trash2Icon className='size-4' />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side='left' sideOffset={4}>
+            {t('workspace.deleteSelected')}
+          </TooltipContent>
+        </Tooltip>
+      </div>
     </div>
   )
 }
@@ -261,6 +301,7 @@ function BlockCard({
         className='overflow-hidden rounded-md bg-card/90 text-xs ring-1 ring-border data-[selected=true]:ring-primary'
       >
         <AccordionTrigger
+          data-testid={`textblock-trigger-${index}`}
           onClick={(e) => {
             if (e.shiftKey || e.ctrlKey || e.metaKey) {
               e.preventDefault()
