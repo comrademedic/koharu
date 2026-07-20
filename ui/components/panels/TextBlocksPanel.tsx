@@ -33,6 +33,7 @@ import { useJobsStore } from '@/lib/stores/jobsStore'
 import { usePreferencesStore } from '@/lib/stores/preferencesStore'
 import { useSelectionStore } from '@/lib/stores/selectionStore'
 import { cn } from '@/lib/utils'
+import { buildTranslationContext } from '@/lib/translationContext'
 
 export function TextBlocksPanel() {
   const { t } = useTranslation()
