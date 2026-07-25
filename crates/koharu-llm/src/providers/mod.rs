@@ -227,16 +227,20 @@ const GEMINI_MODELS: &[ProviderModelDescriptor] = &[
         name: "Gemini Flash-Lite Latest",
     },
     ProviderModelDescriptor {
-        id: "gemini-flash-latest",
-        name: "Gemini Flash Latest",
-    },
-    ProviderModelDescriptor {
         id: "gemini-pro-latest",
         name: "Gemini Pro Latest",
     },
     ProviderModelDescriptor {
+        id: "gemini-3.6-flash",
+        name: "Gemini 3.6 Flash",
+    },
+    ProviderModelDescriptor {
         id: "gemini-3.5-flash",
         name: "Gemini 3.5 Flash",
+    },
+    ProviderModelDescriptor {
+        id: "gemini-3.5-flash-lite",
+        name: "Gemini 3.5 Flash-Lite",
     },
     ProviderModelDescriptor {
         id: "gemini-3.1-pro-preview",
